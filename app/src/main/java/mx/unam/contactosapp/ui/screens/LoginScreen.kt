@@ -25,6 +25,7 @@ import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.AppTextField
 import mx.unam.contactosapp.ui.components.ErrorDialog
 import mx.unam.contactosapp.ui.components.LoadingDialog
+import mx.unam.contactosapp.utils.FirestoreUtils
 import mx.unam.contactosapp.viewmodel.HomeViewModel
 
 @Composable
@@ -94,44 +95,7 @@ fun LoginScreen(
                 errorMessage.value = null
                 auth.signInWithEmailAndPassword(email, password).addOnCompleteListener{ task ->
                     if (task.isSuccessful) {
-                        val uid = auth.currentUser?.uid ?: return@addOnCompleteListener
-                        FirebaseFirestore.getInstance()
-                            .collection("contacts")
-                            .whereEqualTo("uidUsuario", uid)
-                            .get()
-                            .addOnSuccessListener { result ->
-                                val contactos = result.map { doc ->
-                                    Contact(
-                                        name = doc.getString("name") ?: "",
-                                        phone = doc.getString("phone") ?: "",
-                                        email = doc.getString("email") ?: "",
-                                        imageUrl = doc.getString("imageUrl") ?: "",
-                                        uidUser = doc.getString("uidUsuario") ?: ""
-                                    )
-                                }
-
-                                Log.i("diego", "Se cargaron ${contactos.size} contactos")
-
-                                FirebaseFirestore.getInstance()
-                                    .collection("users")
-                                    .document(uid)
-                                    .get()
-                                    .addOnSuccessListener { document ->
-                                        val nombre = document.getString("nombre") ?: "Usuario"
-                                        Log.i("diego", "Nombre de usuario: $nombre")
-                                        homeViewModel.setNombreUsuario(nombre)
-                                        navigateToHome()
-                                        isLoading.value = false
-                                    }
-                                    .addOnFailureListener { e ->
-                                        errorMessage.value = e.message
-                                        isLoading.value = false
-                                    }
-                            }
-                            .addOnFailureListener { e ->
-                                errorMessage.value = e.message
-                                isLoading.value = false
-                            }
+                        FirestoreUtils().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
                     } else {
                         Log.i("diego", "Error: ${task.exception?.message}")
                         errorMessage.value = "Correo o Contraseña Incorrectos"

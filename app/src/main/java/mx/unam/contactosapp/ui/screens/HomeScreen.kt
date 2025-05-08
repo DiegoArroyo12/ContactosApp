@@ -5,32 +5,46 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.ContactCard
 import mx.unam.contactosapp.ui.theme.Cancel
+import mx.unam.contactosapp.utils.FirestoreUtils
 import mx.unam.contactosapp.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
-    navigateToAddContact: () -> Unit,
+    navigateToAddContact: (String?) -> Unit,
     homeViewModel: HomeViewModel
 ) {
+    val isLoading = remember { mutableStateOf(false) }
+    val errorMessage = remember { mutableStateOf<String?>(null) }
+    val nombre by homeViewModel.nombreUsuario.collectAsState()
+    val contacts by homeViewModel.contactos.collectAsState()
+    val searchQuery = remember { mutableStateOf("") }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val showSnackbar = remember { mutableStateOf(false) }
+    val confirmDialogVisible = remember { mutableStateOf<String?>(null) }
+
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
             TopAppBar(
                 title = {
-
-                    val nombre by homeViewModel.nombreUsuario.collectAsState()
                     Text(
                         text = "Contactos de ${nombre.ifBlank { "Usuario" }}",
                         style = MaterialTheme.typography.headlineMedium,
@@ -64,13 +78,70 @@ fun HomeScreen(
                     )
                 }
 
-                // New Contact
-                AppButton(onClick = { navigateToAddContact() }) {
+                // Nuevo Contacto
+                AppButton(onClick = { navigateToAddContact(null) }) {
                     Text("Agregar Contacto")
                 }
             }
         }
     ) { paddingValues ->
+        if (isLoading.value) {
+            mx.unam.contactosapp.ui.components.LoadingDialog("Eliminando contacto...")
+        }
+
+        errorMessage.value?.let { message ->
+            mx.unam.contactosapp.ui.components.ErrorDialog(message = message) {
+                errorMessage.value = null
+            }
+        }
+
+        if (showSnackbar.value) {
+            LaunchedEffect(Unit) {
+                snackbarHostState.showSnackbar("Contacto eliminado exitosamente")
+                showSnackbar.value = false
+            }
+        }
+
+        confirmDialogVisible.value?.let { contactIdToDelete ->
+            AlertDialog(
+                onDismissRequest = { confirmDialogVisible.value = null },
+                title = { Text("Confirmar Eliminación") },
+                text = { Text("¿Estás seguro de que deseas eliminar este contacto?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        isLoading.value = true
+                        FirestoreUtils().deleteContactById(contactIdToDelete,
+                            onSuccess = {
+                                FirestoreUtils().getContactsUser(
+                                    auth = FirebaseAuth.getInstance(),
+                                    homeViewModel = homeViewModel,
+                                    navigateToHome = {},
+                                    errorMessage = errorMessage,
+                                    isLoading = isLoading
+                                )
+                                confirmDialogVisible.value = null
+                                showSnackbar.value = true
+                            },
+                            onFailure = {
+                                errorMessage.value = it.message
+                                isLoading.value = false
+                                confirmDialogVisible.value = null
+                            }
+                        )
+                    }) {
+                        Text("Eliminar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        confirmDialogVisible.value = null
+                    }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,27 +150,36 @@ fun HomeScreen(
                 .padding(16.dp)
         ) {
             TextField(
-                value = "",
-                onValueChange = {},
+                value = searchQuery.value,
+                onValueChange = { searchQuery.value = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                placeholder = { Text("Buscar contacto") }
+                placeholder = { Text("Buscar contacto") },
+                singleLine = true
             )
 
-            val contacts by homeViewModel.contact.collectAsState()
+            val filteredContacts = contacts.filter {
+                it.name.contains(searchQuery.value, ignoreCase = true) ||
+                it.phone.contains(searchQuery.value, ignoreCase = true) ||
+                it.email.contains(searchQuery.value, ignoreCase = true)
+            }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(contacts.size) { index ->
-                    val contact = contacts[index]
+                items(filteredContacts.size) { index ->
+                    val contact = filteredContacts[index]
                     ContactCard(
                         name = contact.name,
                         phone = contact.phone,
-                        correo = contact.email,
-                        imageUrl = contact.imageUrl
+                        email = contact.email,
+                        imageUrl = contact.imageUrl,
+                        onEdit = { navigateToAddContact(contact.id) },
+                        onDelete =  {
+                            confirmDialogVisible.value = contact.id
+                        }
                     )
                 }
             }

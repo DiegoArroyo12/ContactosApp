@@ -53,34 +53,25 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Objects
 import android.graphics.BitmapFactory
+import android.media.ExifInterface
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
+import androidx.compose.runtime.LaunchedEffect
+import mx.unam.contactosapp.utils.FirestoreUtils
+import mx.unam.contactosapp.viewmodel.HomeViewModel
 import java.io.ByteArrayOutputStream
-
-fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
-    val width = bitmap.width
-    val height = bitmap.height
-    val ratio: Float = width.toFloat() / height.toFloat()
-    val newWidth: Int
-    val newHeight: Int
-    if (ratio > 1) {
-        newWidth = maxSize
-        newHeight = (maxSize / ratio).toInt()
-    } else {
-        newHeight = maxSize
-        newWidth = (maxSize * ratio).toInt()
-    }
-    return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
-}
 
 @Composable
 fun AddContactScreen(
     auth: FirebaseAuth,
-    navigateToHome: () -> Unit
+    navigateToHome: () -> Unit,
+    homeViewModel: HomeViewModel,
+    contactId: String?
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
-    var imageUrl by remember { mutableStateOf("") }
     var uidUser by remember { mutableStateOf("") }
     val isLoading = remember { mutableStateOf(false) }
     val errorMessage = remember { mutableStateOf<String?>(null) }
@@ -118,6 +109,22 @@ fun AddContactScreen(
         }
     }
 
+    // Editar Contacto
+    LaunchedEffect(contactId) {
+        if (!contactId.isNullOrEmpty() && contactId != "null") {
+            FirestoreUtils().editContactById(
+                contactId,
+                context,
+                onName = { name = it },
+                onPhone = { phone = it },
+                onEmail = { email = it },
+                onImageUri = { capturedImageUri = it }
+            )
+        } else {
+            Log.e("AddContact", "El contactId es null")
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -125,14 +132,14 @@ fun AddContactScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Nuevo Contacto",
+            text = if (!contactId.isNullOrEmpty() && contactId != null) "Actualizar Contacto" else "Nuevo Contacto",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.align(Alignment.CenterHorizontally),
             color = Color.White
         )
 
         if (isLoading.value) {
-            LoadingDialog("Registrando Contacto...")
+            LoadingDialog(if (!contactId.isNullOrEmpty() && contactId != null) "Actualizando Contacto..." else "Registrando Contacto...")
         }
 
         errorMessage.value?.let { message ->
@@ -224,12 +231,12 @@ fun AddContactScreen(
                     val inputStream = context.contentResolver.openInputStream(capturedImageUri)
                     val bitmap = BitmapFactory.decodeStream(inputStream)
                     if (bitmap != null) {
-                        val resizeBitmap = resizeBitmap(bitmap, 500)
+                        val rotateBitmap = FirestoreUtils().rotateBitmapIfRequired(context, capturedImageUri, bitmap)
+                        val resizeBitmap = FirestoreUtils().resizeBitmap(rotateBitmap, 500)
                         val outputStream = ByteArrayOutputStream()
                         resizeBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
                         val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
 
-                        // Guardar Contacto en Firestore
                         val db = FirebaseFirestore.getInstance()
                         val contact = hashMapOf(
                             "nombre" to name,
@@ -238,15 +245,33 @@ fun AddContactScreen(
                             "foto" to base64Image,
                             "uidUsuario" to uidUser
                         )
-                        db.collection("contacts").add(contact)
-                            .addOnSuccessListener {
+
+                        // Success
+                        val onSuccess = {
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                FirestoreUtils().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
                                 navigateToHome()
                                 isLoading.value = false
-                            }
-                            .addOnFailureListener { e ->
-                                errorMessage.value = e.message
-                                isLoading.value = false
-                            }
+                            }, 700)
+                        }
+
+                        // Error
+                        val onFailure: (Exception) -> Unit = { e ->
+                            errorMessage.value = e.message
+                            isLoading.value = false
+                        }
+
+                        if (!contactId.isNullOrEmpty() && contactId != "null") {
+                            // Actualizar Contacto
+                            db.collection("contacts").document(contactId).set(contact)
+                                .addOnSuccessListener { onSuccess() }
+                                .addOnFailureListener { onFailure(it) }
+                        } else {
+                            // Guardar Contacto
+                            db.collection("contacts").add(contact)
+                                .addOnSuccessListener { onSuccess() }
+                                .addOnFailureListener { onFailure(it) }
+                        }
                     } else {
                         errorMessage.value = "No se pudo decodificar la imagen seleccionada."
                         isLoading.value = false
@@ -258,7 +283,7 @@ fun AddContactScreen(
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Registrar")
+            Text(if (!contactId.isNullOrEmpty() && contactId != "null") "Actualizar" else "Registrar")
         }
 
         Spacer(modifier = Modifier.height(8.dp))

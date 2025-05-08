@@ -24,7 +24,14 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
 @Composable
-fun ContactCard(name: String, phone: String, correo: String, imageUrl: String) {
+fun ContactCard(
+    name: String,
+    phone: String,
+    email: String,
+    imageUrl: String,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -66,38 +73,43 @@ fun ContactCard(name: String, phone: String, correo: String, imageUrl: String) {
                             .clip(CircleShape)
                     )
                 }
+
                 Spacer(modifier = Modifier.width(16.dp))
+
                 Text(
                     text = name,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Expandir o Colapsar",
-                    tint = Color.Gray
-                )
+
                 // Editar Contacto
-                IconButton(onClick = { /* TODO: Implement edit logic */ }) {
+                IconButton(onClick = { onEdit() }) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Editar",
                         tint = Color.Gray
                     )
                 }
+
                 // Eliminar Contacto
-                IconButton(onClick = { /* TODO: Implement delete logic */ }) {
+                IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Eliminar",
                         tint = Color.Gray
                     )
                 }
+
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = "Expandir o Colapsar",
+                    tint = Color.Gray
+                )
             }
             if (expanded) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Teléfono: $phone")
-                Text("Correo: $correo")
+                Text("Correo: $email")
             }
         }
     }

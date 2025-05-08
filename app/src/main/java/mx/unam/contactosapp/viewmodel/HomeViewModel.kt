@@ -18,39 +18,49 @@ class HomeViewModel: ViewModel() {
 
     private var db : FirebaseFirestore = Firebase.firestore
     private val _contactos = MutableStateFlow<List<Contact>>(emptyList())
-    val contact:StateFlow<List<Contact>> = _contactos
+    val contactos:StateFlow<List<Contact>> = _contactos
     private val _nombreUsuario = MutableStateFlow("")
     val nombreUsuario: StateFlow<String> = _nombreUsuario
 
     init {
-        getContact()
+        listenToContacts()
     }
 
-    private fun getContact() {
-        viewModelScope.launch {
-            val result: List<Contact> = withContext(Dispatchers.IO) {
-                getAllContacts()
-            }
-            _contactos.value = result
+    private fun listenToContacts() {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _contactos.value = emptyList()
+            return
         }
-    }
 
-    private suspend fun getAllContacts(): List<Contact> {
-        return try {
-            db.collection("contacts")
-                .get()
-                .await()
-                .documents
-                .mapNotNull { snapshot ->
-                    snapshot.toObject(Contact::class.java)
+        db.collection("contacts")
+            .whereEqualTo("uidUsuario", uid)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.w("HomeViewModel", "Listen failed.", e)
+                    return@addSnapshotListener
                 }
-        } catch (e: Exception) {
-            Log.i("diego", e.toString())
-            emptyList()
-        }
+
+                if (snapshot != null && !snapshot.isEmpty) {
+                    val contactos = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(Contact::class.java)?.copy(id = doc.id)
+                    }
+                    _contactos.value = contactos
+                } else {
+                    _contactos.value = emptyList()
+                }
+            }
     }
 
     fun setNombreUsuario(nombre: String) {
         _nombreUsuario.value = nombre
+    }
+
+    fun setContactos(contactos: List<Contact>) {
+        _contactos.value = contactos
+    }
+
+    fun recargarContactos() {
+        listenToContacts()
     }
 }
