@@ -19,6 +19,8 @@ class HomeViewModel: ViewModel() {
     private var db : FirebaseFirestore = Firebase.firestore
     private val _contactos = MutableStateFlow<List<Contact>>(emptyList())
     val contact:StateFlow<List<Contact>> = _contactos
+    private val _nombreUsuario = MutableStateFlow("")
+    val nombreUsuario: StateFlow<String> = _nombreUsuario
 
     init {
         getContact()
@@ -46,5 +48,9 @@ class HomeViewModel: ViewModel() {
             Log.i("diego", e.toString())
             emptyList()
         }
+    }
+
+    fun setNombreUsuario(nombre: String) {
+        _nombreUsuario.value = nombre
     }
 }
