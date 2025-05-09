@@ -53,12 +53,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Objects
 import android.graphics.BitmapFactory
-import android.media.ExifInterface
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import androidx.compose.runtime.LaunchedEffect
-import mx.unam.contactosapp.utils.FirestoreUtils
+import mx.unam.contactosapp.R
+import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.viewmodel.HomeViewModel
 import java.io.ByteArrayOutputStream
 
@@ -112,7 +112,7 @@ fun AddContactScreen(
     // Editar Contacto
     LaunchedEffect(contactId) {
         if (!contactId.isNullOrEmpty() && contactId != "null") {
-            FirestoreUtils().editContactById(
+            FirebaseRepository().editContactById(
                 contactId,
                 context,
                 onName = { name = it },
@@ -204,9 +204,13 @@ fun AddContactScreen(
         ) {
             Text("Foto")
         }
-        if (capturedImageUri != Uri.EMPTY) {
+
+        // Asignación default de foto
+        val imageModel = if (capturedImageUri != Uri.EMPTY) capturedImageUri else R.drawable.default_contact
+
+        if (imageModel != Uri.EMPTY) {
             Image(
-                painter = rememberAsyncImagePainter(model = capturedImageUri),
+                painter = rememberAsyncImagePainter(model = imageModel),
                 contentDescription = "Foto del Nuevo Contacto",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -221,64 +225,81 @@ fun AddContactScreen(
 
         AppButton (
             onClick = {
+                // Validar que se llenen los campos antes de registrar
+                if (name.isBlank() || email.isBlank() || phone.isBlank()) {
+                    errorMessage.value = "Por favor completa todos los campos antes de registrarte."
+                    return@AppButton
+                }
+
+                // Validar correo
+                val emailRegex = Regex("^[A-Za-z](.*)([@]{1})(.{1,})(\\.)(.{1,})")
+                if (!emailRegex.matches(email)) {
+                    errorMessage.value = "Ingresa un correo válido."
+                    return@AppButton
+                }
+
+                // Validar teléfono
+                if (!phone.matches(Regex("^\\d{10}$"))) {
+                    errorMessage.value = "Ingresa un número de teléfono válido de 10 dígitos."
+                    return@AppButton
+                }
+
                 isLoading.value = true
                 errorMessage.value = null
                 val userId = auth.currentUser?.uid ?: return@AppButton
                 uidUser = userId
 
+                val db = FirebaseFirestore.getInstance()
+                val contact = hashMapOf(
+                    "nombre" to name,
+                    "telefono" to phone,
+                    "correo" to email,
+                    "uidUsuario" to uidUser
+                )
+
                 if (capturedImageUri != Uri.EMPTY) {
-                    Log.i("diego", "URI que se va a subir: $capturedImageUri")
                     val inputStream = context.contentResolver.openInputStream(capturedImageUri)
                     val bitmap = BitmapFactory.decodeStream(inputStream)
                     if (bitmap != null) {
-                        val rotateBitmap = FirestoreUtils().rotateBitmapIfRequired(context, capturedImageUri, bitmap)
-                        val resizeBitmap = FirestoreUtils().resizeBitmap(rotateBitmap, 500)
+                        val rotateBitmap = FirebaseRepository().rotateBitmapIfRequired(context, capturedImageUri, bitmap)
+                        val resizeBitmap = FirebaseRepository().resizeBitmap(rotateBitmap, 500)
                         val outputStream = ByteArrayOutputStream()
                         resizeBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
                         val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
 
-                        val db = FirebaseFirestore.getInstance()
-                        val contact = hashMapOf(
-                            "nombre" to name,
-                            "telefono" to phone,
-                            "correo" to email,
-                            "foto" to base64Image,
-                            "uidUsuario" to uidUser
-                        )
-
-                        // Success
-                        val onSuccess = {
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                FirestoreUtils().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
-                                navigateToHome()
-                                isLoading.value = false
-                            }, 700)
-                        }
-
-                        // Error
-                        val onFailure: (Exception) -> Unit = { e ->
-                            errorMessage.value = e.message
-                            isLoading.value = false
-                        }
-
-                        if (!contactId.isNullOrEmpty() && contactId != "null") {
-                            // Actualizar Contacto
-                            db.collection("contacts").document(contactId).set(contact)
-                                .addOnSuccessListener { onSuccess() }
-                                .addOnFailureListener { onFailure(it) }
-                        } else {
-                            // Guardar Contacto
-                            db.collection("contacts").add(contact)
-                                .addOnSuccessListener { onSuccess() }
-                                .addOnFailureListener { onFailure(it) }
-                        }
+                        // Agregar la foto tomada
+                        contact["foto"] = base64Image
                     } else {
                         errorMessage.value = "No se pudo decodificar la imagen seleccionada."
                         isLoading.value = false
                     }
-                } else {
-                    errorMessage.value = "Archivo de imagen no encontrado o fue eliminado."
+                }
+
+                // Success
+                val onSuccess = {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        FirebaseRepository().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
+                        navigateToHome()
+                        isLoading.value = false
+                    }, 700)
+                }
+
+                // Error
+                val onFailure: (Exception) -> Unit = { e ->
+                    errorMessage.value = e.message
                     isLoading.value = false
+                }
+
+                if (!contactId.isNullOrEmpty() && contactId != "null") {
+                    // Actualizar Contacto
+                    db.collection("contacts").document(contactId).set(contact)
+                        .addOnSuccessListener { onSuccess() }
+                        .addOnFailureListener { onFailure(it) }
+                } else {
+                    // Guardar Contacto
+                    db.collection("contacts").add(contact)
+                        .addOnSuccessListener { onSuccess() }
+                        .addOnFailureListener { onFailure(it) }
                 }
             },
             modifier = Modifier.fillMaxWidth()

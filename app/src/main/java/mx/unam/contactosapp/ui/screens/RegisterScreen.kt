@@ -106,6 +106,25 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
 
         AppButton(
             onClick = {
+                // Validar que se llenen los campos antes de registrar
+                if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
+                    errorMessage.value = "Por favor completa todos los campos antes de registrarte."
+                    return@AppButton
+                }
+
+                // Validar correo
+                val emailRegex = Regex("^[A-Za-z](.*)([@]{1})(.{1,})(\\.)(.{1,})")
+                if (!emailRegex.matches(email)) {
+                    errorMessage.value = "Ingresa un correo válido."
+                    return@AppButton
+                }
+
+                // Validar teléfono
+                if (!phone.matches(Regex("^\\d{10}$"))) {
+                    errorMessage.value = "Ingresa un número de teléfono válido de 10 dígitos."
+                    return@AppButton
+                }
+
                 isLoading.value = true
                 errorMessage.value = null
                 auth.createUserWithEmailAndPassword(email, password)
@@ -132,8 +151,19 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
                                     isLoading.value = false
                                 }
                         } else {
-                            Log.i("diego", "Error: ${task.exception?.message}")
-                            errorMessage.value = "No se puedo registrar el nuevo usuario"
+                            val exceptionMessage = task.exception?.message
+                            Log.i("diego", "Error: $exceptionMessage")
+
+                            errorMessage.value = when {
+                                exceptionMessage?.contains("email address is badly formatted", ignoreCase = true) == true ->
+                                    "El formato del correo es inválido."
+                                exceptionMessage?.contains("password is invalid", ignoreCase = true) == true ||
+                                exceptionMessage?.contains("least 6 characters", ignoreCase = true) == true ->
+                                    "La contraseña debe tener al menos 6 caracteres."
+                                exceptionMessage?.contains("email address is already in use", ignoreCase = true) == true ->
+                                    "El correo ya está registrado."
+                                else -> "No se pudo registrar el nuevo usuario. Intenta nuevamente más tarde."
+                            }
                             isLoading.value = false
                         }
                     }

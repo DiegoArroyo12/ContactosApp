@@ -1,4 +1,4 @@
-package mx.unam.contactosapp.utils
+package mx.unam.contactosapp.data.repository
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -10,8 +10,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import mx.unam.contactosapp.data.model.Contact
 import mx.unam.contactosapp.viewmodel.HomeViewModel
+import java.io.ByteArrayOutputStream
 
-class FirestoreUtils() {
+class FirebaseRepository() {
 
     // Obtener los contactos de un usuario y el nombre del usuario
     fun getContactsUser(
@@ -37,26 +38,34 @@ class FirestoreUtils() {
                         id = doc.id
                     )
                 }
-
-                Log.i("diego", "Se cargaron ${contactos.size} contactos")
-
+                // Guardamos los contactos
                 homeViewModel.setContactos(contactos)
+                // Guardar nombre del usuario
+                getUserName(auth, homeViewModel, errorMessage, isLoading)
+                navigateToHome()
+            }
+            .addOnFailureListener { e ->
+                errorMessage.value = e.message
+                isLoading.value = false
+            }
+    }
 
-                FirebaseFirestore.getInstance()
-                    .collection("users")
-                    .document(uid)
-                    .get()
-                    .addOnSuccessListener { document ->
-                        val nombre = document.getString("nombre") ?: "Usuario"
-                        Log.i("diego", "Nombre de usuario: $nombre")
-                        homeViewModel.setNombreUsuario(nombre)
-                        navigateToHome()
-                        isLoading.value = false
-                    }
-                    .addOnFailureListener { e ->
-                        errorMessage.value = e.message
-                        isLoading.value = false
-                    }
+    fun getUserName(
+        auth: FirebaseAuth,
+        homeViewModel: HomeViewModel,
+        errorMessage: MutableState<String?>,
+        isLoading: MutableState<Boolean>
+    ) {
+        val uid = auth.currentUser?.uid ?: return
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                val nombre = document.getString("nombre") ?: "Usuario"
+                // Guardamos el nombre del usuario
+                homeViewModel.setNombreUsuario(nombre)
+                isLoading.value = false
             }
             .addOnFailureListener { e ->
                 errorMessage.value = e.message

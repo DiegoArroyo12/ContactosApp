@@ -21,7 +21,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import mx.unam.contactosapp.R
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import mx.unam.contactosapp.data.repository.FirebaseRepository
 
 @Composable
 fun ContactCard(
@@ -63,10 +68,20 @@ fun ContactCard(
                         android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)
                     }
                 }
+
                 if (bitmap != null) {
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = "Imagen del contacto",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.default_contact),
+                        contentDescription = "Imagen del contacto por defecto",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(60.dp)

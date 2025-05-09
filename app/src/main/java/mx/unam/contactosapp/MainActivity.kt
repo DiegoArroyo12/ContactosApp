@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -30,20 +31,34 @@ class MainActivity : ComponentActivity() {
         setContent {
             navHostController = rememberNavController()
             val currentUser = auth.currentUser
+            val context = LocalContext.current
+            val sharedPref = context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+            val rememberUser = sharedPref.getBoolean("rememberUser", false)
 
             ContactosAppTheme(dynamicColor = false) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation(navHostController, auth)
+                    val homeViewModel = (application as ContactosApp).homeViewModel
+                    AppNavigation(navHostController, auth, homeViewModel)
 
-                    // Si ya está logueado, redirige al home
+                    // Si esta logueado y marco la casilla de recordarme pasa al home
                     LaunchedEffect(currentUser) {
-                        if (currentUser != null) {
+                        if (currentUser != null && rememberUser) {
+                            val homeViewModel = (application as ContactosApp).homeViewModel
+                            val uid = currentUser.uid
+
                             navHostController.navigate("home") {
                                 popUpTo("login") { inclusive = true }
                             }
+
+                            homeViewModel.getNombreUsuarioPorUID(uid)
+                            val errorMessage = mutableStateOf<String?>(null)
+                            val isLoading = mutableStateOf(false)
+                            // Recargamos la sesión
+                            homeViewModel.reloadSesion(auth, {}, errorMessage, isLoading
+                            )
                         }
                     }
                 }

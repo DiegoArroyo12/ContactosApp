@@ -1,9 +1,13 @@
 package mx.unam.contactosapp.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import mx.unam.contactosapp.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,7 +22,7 @@ import com.google.firebase.auth.FirebaseAuth
 import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.ContactCard
 import mx.unam.contactosapp.ui.theme.Cancel
-import mx.unam.contactosapp.utils.FirestoreUtils
+import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +37,7 @@ fun HomeScreen(
     val nombre by homeViewModel.nombreUsuario.collectAsState()
     val contacts by homeViewModel.contactos.collectAsState()
     val searchQuery = remember { mutableStateOf("") }
+    val confirmLogout = remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val showSnackbar = remember { mutableStateOf(false) }
@@ -65,12 +70,7 @@ fun HomeScreen(
             ) {
                 // Logout
                 AppButton(
-                    onClick = {
-                        FirebaseAuth.getInstance().signOut()
-                        navController.navigate("login") {
-                            popUpTo("home") { inclusive = true }
-                        }
-                    },
+                    onClick = { confirmLogout.value = true },
                     color = Cancel
                 ) {
                     Text(
@@ -110,9 +110,9 @@ fun HomeScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         isLoading.value = true
-                        FirestoreUtils().deleteContactById(contactIdToDelete,
+                        FirebaseRepository().deleteContactById(contactIdToDelete,
                             onSuccess = {
-                                FirestoreUtils().getContactsUser(
+                                FirebaseRepository().getContactsUser(
                                     auth = FirebaseAuth.getInstance(),
                                     homeViewModel = homeViewModel,
                                     navigateToHome = {},
@@ -142,6 +142,33 @@ fun HomeScreen(
             )
         }
 
+        // Confirm logout dialog
+        if (confirmLogout.value) {
+            AlertDialog(
+                onDismissRequest = { confirmLogout.value = false },
+                title = { Text("Cerrar Sesión") },
+                text = { Text("¿Estás seguro de que deseas cerrar sesión?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        FirebaseAuth.getInstance().signOut()
+                        val sharedPref = navController.context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+                        sharedPref.edit().putBoolean("rememberUser", false).apply()
+                        navController.navigate("login") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                        confirmLogout.value = false
+                    }) {
+                        Text("Cerrar sesión")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmLogout.value = false }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -156,7 +183,13 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 placeholder = { Text("Buscar contacto") },
-                singleLine = true
+                singleLine = true,
+                leadingIcon = {
+                    Image(
+                        painter = painterResource(id = R.drawable.search_icon),
+                        contentDescription = "Buscar"
+                    )
+                }
             )
 
             val filteredContacts = contacts.filter {

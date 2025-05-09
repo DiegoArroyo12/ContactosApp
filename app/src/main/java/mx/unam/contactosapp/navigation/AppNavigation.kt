@@ -17,9 +17,9 @@ import mx.unam.contactosapp.viewmodel.HomeViewModel
 @Composable
 fun AppNavigation(
     navHostController: NavHostController,
-    auth: FirebaseAuth
+    auth: FirebaseAuth,
+    homeViewModel: HomeViewModel
 ) {
-    val homeViewModel: HomeViewModel = viewModel()
 
     NavHost(navController = navHostController, startDestination = "login") {
 

@@ -1,8 +1,11 @@
 package mx.unam.contactosapp.ui.screens
 
+import android.content.Context
 import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,16 +20,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import mx.unam.contactosapp.data.model.Contact
 import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.AppTextField
 import mx.unam.contactosapp.ui.components.ErrorDialog
 import mx.unam.contactosapp.ui.components.LoadingDialog
-import mx.unam.contactosapp.utils.FirestoreUtils
+import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.viewmodel.HomeViewModel
+import androidx.core.content.edit
+import mx.unam.contactosapp.ui.components.AppCheckBox
 
 @Composable
 fun LoginScreen(
@@ -41,6 +43,9 @@ fun LoginScreen(
     val errorMessage = remember { mutableStateOf<String?>(null) }
     val email = emailState.value
     val password = passwordState.value
+
+    val rememberMe = remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Column(
         modifier = Modifier
@@ -89,13 +94,38 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .clickable { rememberMe.value = !rememberMe.value },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppCheckBox(
+                checked = rememberMe.value,
+                onCheckedChange = { rememberMe.value = it },
+            )
+            Text("Recordarme", color = Color.White)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         AppButton(
             onClick = {
+                // Validar que se llenen los campos antes de registrar
+                if (email.isBlank() || password.isBlank()) {
+                    errorMessage.value = "Por favor ingresa tu correo y contraseña "
+                    return@AppButton
+                }
+
                 isLoading.value = true
                 errorMessage.value = null
                 auth.signInWithEmailAndPassword(email, password).addOnCompleteListener{ task ->
                     if (task.isSuccessful) {
-                        FirestoreUtils().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
+                        if (rememberMe.value) {
+                            val sharedPref = context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+                            sharedPref.edit() { putBoolean("rememberUser", true) }
+                        }
+                        FirebaseRepository().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
                     } else {
                         Log.i("diego", "Error: ${task.exception?.message}")
                         errorMessage.value = "Correo o Contraseña Incorrectos"
