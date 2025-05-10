@@ -1,7 +1,6 @@
 package mx.unam.contactosapp.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,14 +27,26 @@ fun AppNavigation(
                 auth = auth,
                 homeViewModel = homeViewModel,
                 navigateToHome = { navHostController.navigate("home") },
-                navigateToRegister = { navHostController.navigate("register") }
+                navigateToRegister = { navHostController.navigate("register?isEditMode=false") }
             )
         }
 
-        composable("register") {
+        composable(
+            route = "register?isEditMode={isEditMode}",
+            arguments = listOf(
+                navArgument("isEditMode") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val isEditMode = backStackEntry.arguments?.getBoolean("isEditMode") ?: false
             RegisterScreen(
                 auth = auth,
-                navigateToLogin = { navHostController.navigate("login") }
+                navigateToLogin = { navHostController.navigate("login") },
+                navigateToHome = { navHostController.navigate("home") },
+                homeViewModel = homeViewModel,
+                isEditMode = isEditMode
             )
         }
 

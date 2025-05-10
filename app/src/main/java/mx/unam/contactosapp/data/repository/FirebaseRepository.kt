@@ -10,9 +10,111 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import mx.unam.contactosapp.data.model.Contact
 import mx.unam.contactosapp.viewmodel.HomeViewModel
-import java.io.ByteArrayOutputStream
 
 class FirebaseRepository() {
+
+    // Crear un nuevo usuario
+    fun createUser(
+        auth: FirebaseAuth,
+        name: String,
+        email: String,
+        phone: String,
+        password: String,
+        navigateToLogin: () -> Unit,
+        errorMessage: MutableState<String?>,
+        isLoading: MutableState<Boolean>
+    ) {
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val uid = auth.currentUser?.uid
+                    val userData = hashMapOf(
+                        "nombre" to name,
+                        "correo" to email,
+                        "telefono" to phone
+                    )
+
+                    FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(uid ?: "")
+                        .set(userData)
+                        .addOnSuccessListener {
+                            isLoading.value = false
+                            navigateToLogin()
+                        }
+                        .addOnFailureListener { e ->
+                            errorMessage.value = e.message
+                            isLoading.value = false
+                        }
+                } else {
+                    val exceptionMessage = task.exception?.message
+
+                    errorMessage.value = when {
+                        exceptionMessage?.contains("email address is badly formatted", ignoreCase = true) == true ->
+                            "El formato del correo es inválido."
+                        exceptionMessage?.contains("password is invalid", ignoreCase = true) == true ||
+                                exceptionMessage?.contains("least 6 characters", ignoreCase = true) == true ->
+                            "La contraseña debe tener al menos 6 caracteres."
+                        exceptionMessage?.contains("email address is already in use", ignoreCase = true) == true ->
+                            "El correo ya está registrado."
+                        else -> "No se pudo registrar el nuevo usuario. Intenta nuevamente más tarde."
+                    }
+                    isLoading.value = false
+                }
+            }
+    }
+
+    // Editar Usuario
+    fun editUser(
+        auth: FirebaseAuth,
+        name: String,
+        email: String,
+        phone: String,
+        password: String,
+        homeViewModel: HomeViewModel,
+        navigateToHome: () -> Unit,
+        errorMessage: MutableState<String?>,
+        isLoading: MutableState<Boolean>
+    ) {
+        val uid = auth.currentUser?.uid
+        if (uid != null) {
+            val updatedUserData = mapOf(
+                "nombre" to name,
+                "correo" to email,
+                "telefono" to phone
+            )
+
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .update(updatedUserData)
+                .addOnSuccessListener {
+                    isLoading.value = false
+
+                    // Actualizar el correo de atenticación
+                    val currentEmail = auth.currentUser?.email
+                    if (currentEmail != null && currentEmail != email) {
+                        auth.currentUser?.verifyBeforeUpdateEmail(email)
+                            ?.addOnSuccessListener {
+                                Log.i("AuthUpdate", "Correo actualizado en Auth, se requiere verificación")
+                            }
+                            ?.addOnFailureListener { e ->
+                                Log.e("AuthUpdate", "Error al actualizar correo en Auth: ${e.message}")
+                            }
+                    }
+
+                    getUserName(auth, homeViewModel, errorMessage, isLoading)
+                    navigateToHome()
+                }
+                .addOnFailureListener { e ->
+                    errorMessage.value = e.message
+                    isLoading.value = false
+                }
+        } else {
+            errorMessage.value = "No se pudo obtener el usuario actual."
+            isLoading.value = false
+        }
+    }
 
     // Obtener los contactos de un usuario y el nombre del usuario
     fun getContactsUser(

@@ -56,6 +56,18 @@ fun HomeScreen(
                         color = Color.White
                     )
                 },
+                actions = {
+                    IconButton(onClick = {
+                        navController.navigate("register?isEditMode=true")
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.settings_user),
+                            contentDescription = "Editar Usuario",
+                            tint = Color.White,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )

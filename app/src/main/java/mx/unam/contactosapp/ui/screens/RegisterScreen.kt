@@ -1,6 +1,6 @@
 package mx.unam.contactosapp.ui.screens
 
-import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -8,9 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,20 +27,42 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.AppTextField
 import mx.unam.contactosapp.ui.components.ErrorDialog
 import mx.unam.contactosapp.ui.components.LoadingDialog
 import mx.unam.contactosapp.ui.theme.Cancel
+import mx.unam.contactosapp.ui.theme.Photo
+import mx.unam.contactosapp.viewmodel.HomeViewModel
 
 @Composable
-fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
+fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHome: () -> Unit, homeViewModel: HomeViewModel, isEditMode: Boolean) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showNewPasswordDialog by remember { mutableStateOf(false) }
     val isLoading = remember { mutableStateOf(false) }
     val errorMessage = remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(isEditMode) {
+        if (isEditMode) {
+            val user = auth.currentUser
+            user?.uid?.let { uid ->
+                FirebaseFirestore.getInstance().collection("users").document(uid)
+                    .get()
+                    .addOnSuccessListener { document ->
+                        name = document.getString("nombre") ?: ""
+                        email = document.getString("correo") ?: ""
+                        phone = document.getString("telefono") ?: ""
+                    }
+                    .addOnFailureListener { e ->
+                        errorMessage.value = "No se pudieron cargar los datos del usuario: ${e.message}"
+                    }
+            }
+        }
+    }
 
     Column (
         modifier = Modifier
@@ -43,7 +71,7 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         if (isLoading.value) {
-            LoadingDialog("Registrando Usuario...")
+            LoadingDialog(if (isEditMode) "Actualizando Usuario..." else "Registrando Usuario...")
         }
 
         errorMessage.value?.let { message ->
@@ -53,7 +81,7 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
         }
 
         Text(
-            text = "Regístrate",
+            text = if (isEditMode) "Editar Usuario" else "Regístrate",
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.align(Alignment.CenterHorizontally),
             color = Color.White
@@ -94,20 +122,142 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         // Password
-        AppTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = "Contraseña",
-            isPassword = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (isEditMode) {
+            var showPasswordDialog by remember { mutableStateOf(false) }
+
+            AppButton(
+                onClick = { showPasswordDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                color = Photo
+            ) {
+                Text("Cambiar contraseña")
+            }
+
+            // Confirmar contraseña
+            if (showPasswordDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPasswordDialog = false },
+                    title = { Text("Confirmar contraseña actual") },
+                    text = {
+                        var currentPassword by remember { mutableStateOf("") }
+                        var passwordVisible by remember { mutableStateOf(false) }
+                        AppTextField(
+                            value = currentPassword,
+                            onValueChange = { currentPassword = it },
+                            label = "Contraseña actual",
+                            isPassword = !passwordVisible,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                val icon = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    tint = Color.Black,
+                                    modifier = Modifier.clickable { passwordVisible = !passwordVisible }
+                                )
+                            },
+                            colorText = Color.Black
+                        )
+                    },
+                    confirmButton = {
+                        AppButton(
+                            onClick = {
+                                showPasswordDialog = false
+                                showNewPasswordDialog = true
+                            }
+                        ) {
+                            Text("Aceptar")
+                        }
+                    },
+                    dismissButton = {
+                        AppButton(
+                            onClick = { showPasswordDialog = false },
+                            color = Cancel
+                        ) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
+
+            // Nueva contraseña
+            if (showNewPasswordDialog) {
+                var newPassword by remember { mutableStateOf("") }
+                var confirmNewPassword by remember { mutableStateOf("") }
+                AlertDialog(
+                    onDismissRequest = { showNewPasswordDialog = false },
+                    title = { Text("Cambiar contraseña") },
+                    text = {
+                        Column {
+                            AppTextField(
+                                value = newPassword,
+                                onValueChange = { newPassword = it },
+                                label = "Nueva contraseña",
+                                isPassword = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colorText = Color.Black
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            AppTextField(
+                                value = confirmNewPassword,
+                                onValueChange = { confirmNewPassword = it },
+                                label = "Confirmar contraseña",
+                                isPassword = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colorText = Color.Black
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        AppButton(
+                            onClick = {
+                                if (newPassword == confirmNewPassword && newPassword.length >= 6) {
+                                    auth.currentUser?.updatePassword(newPassword)
+                                    showNewPasswordDialog = false
+                                } else {
+                                    errorMessage.value = "Las contraseñas no coinciden o son muy cortas"
+                                }
+                            }
+                        ) {
+                            Text("Actualizar")
+                        }
+                    },
+                    dismissButton = {
+                        AppButton(
+                            onClick = { showNewPasswordDialog = false },
+                            color = Cancel
+                        ) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
+        } else {
+            var passwordVisible by remember { mutableStateOf(false) }
+            AppTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = "Contraseña",
+                isPassword = !passwordVisible,
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    val icon = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                        tint = Color.White,
+                        modifier = Modifier.clickable { passwordVisible = !passwordVisible }
+                    )
+                }
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         AppButton(
             onClick = {
                 // Validar que se llenen los campos antes de registrar
-                if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
+                if (name.isBlank() || email.isBlank() || phone.isBlank() || (!isEditMode && password.isBlank())) {
                     errorMessage.value = "Por favor completa todos los campos antes de registrarte."
                     return@AppButton
                 }
@@ -127,55 +277,22 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit) {
 
                 isLoading.value = true
                 errorMessage.value = null
-                auth.createUserWithEmailAndPassword(email, password)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            val uid = auth.currentUser?.uid
-                            val userData = hashMapOf(
-                                "nombre" to name,
-                                "correo" to email,
-                                "telefono" to phone
-                            )
-
-                            FirebaseFirestore.getInstance()
-                                .collection("users")
-                                .document(uid ?: "")
-                                .set(userData)
-                                .addOnSuccessListener {
-                                    Log.i("diego", "Registro OK y datos guardados en Firestore")
-                                    isLoading.value = false
-                                    navigateToLogin()
-                                }
-                                .addOnFailureListener { e ->
-                                    errorMessage.value = e.message
-                                    isLoading.value = false
-                                }
-                        } else {
-                            val exceptionMessage = task.exception?.message
-                            Log.i("diego", "Error: $exceptionMessage")
-
-                            errorMessage.value = when {
-                                exceptionMessage?.contains("email address is badly formatted", ignoreCase = true) == true ->
-                                    "El formato del correo es inválido."
-                                exceptionMessage?.contains("password is invalid", ignoreCase = true) == true ||
-                                exceptionMessage?.contains("least 6 characters", ignoreCase = true) == true ->
-                                    "La contraseña debe tener al menos 6 caracteres."
-                                exceptionMessage?.contains("email address is already in use", ignoreCase = true) == true ->
-                                    "El correo ya está registrado."
-                                else -> "No se pudo registrar el nuevo usuario. Intenta nuevamente más tarde."
-                            }
-                            isLoading.value = false
-                        }
-                    }
+                if (isEditMode) {
+                    // Actualizar Usuario
+                    FirebaseRepository().editUser(auth, name, email, phone, password, homeViewModel, navigateToHome, errorMessage, isLoading)
+                } else {
+                    // Crear Usuario
+                    FirebaseRepository().createUser(auth, name, email, phone, password, navigateToLogin, errorMessage, isLoading)
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Registrar")
+            Text(if (isEditMode) "Actualizar" else "Registrar")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
         AppButton(
-            onClick = navigateToLogin,
+            onClick = { if (isEditMode) navigateToHome() else navigateToLogin() },
             modifier = Modifier.fillMaxWidth(),
             color = Cancel
         ) {

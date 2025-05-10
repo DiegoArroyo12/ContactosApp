@@ -1,6 +1,9 @@
 package mx.unam.contactosapp.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -19,8 +22,10 @@ fun AppTextField(
     label: String,
     modifier: Modifier = Modifier,
     isPassword : Boolean = false,
+    trailingIcon: @Composable (() -> Unit)? = null,
     isEmmail : Boolean = false,
-    isPhone : Boolean = false
+    isPhone : Boolean = false,
+    colorText: Color = Color.White
 ) {
     OutlinedTextField(
         value = value,
@@ -28,17 +33,18 @@ fun AppTextField(
         label = {
             Text(
                 text = label,
-                color = Color.White
+                color = colorText
             )
         },
         singleLine = true,
         visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = if(isEmmail) KeyboardOptions(keyboardType = KeyboardType.Email) else if (isPhone) KeyboardOptions(keyboardType = KeyboardType.Phone) else KeyboardOptions.Default,
         modifier = modifier,
+        trailingIcon = trailingIcon,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Mainbutton,
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White
+            focusedTextColor = colorText,
+            unfocusedTextColor = colorText
         )
     )
 }
