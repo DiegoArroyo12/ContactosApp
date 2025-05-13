@@ -3,9 +3,12 @@ package mx.unam.contactosapp.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.ExifInterface
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.runtime.MutableState
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import mx.unam.contactosapp.data.model.Contact
@@ -67,6 +70,7 @@ class FirebaseRepository() {
     // Editar Usuario
     fun editUser(
         auth: FirebaseAuth,
+        context: Context,
         name: String,
         email: String,
         phone: String,
@@ -90,21 +94,27 @@ class FirebaseRepository() {
                 .update(updatedUserData)
                 .addOnSuccessListener {
                     isLoading.value = false
+                    navigateToHome()
 
-                    // Actualizar el correo de atenticación
+                    // Mostrar mensajes informativos después de la navegación
                     val currentEmail = auth.currentUser?.email
                     if (currentEmail != null && currentEmail != email) {
                         auth.currentUser?.verifyBeforeUpdateEmail(email)
                             ?.addOnSuccessListener {
-                                Log.i("AuthUpdate", "Correo actualizado en Auth, se requiere verificación")
+                                Toast.makeText(
+                                    context,
+                                    "Correo actualizado. Revisa tu bandeja de entrada o Spam.",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                             ?.addOnFailureListener { e ->
-                                Log.e("AuthUpdate", "Error al actualizar correo en Auth: ${e.message}")
+                                Toast.makeText(
+                                    context,
+                                    "Error al actualizar correo: ${e.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                     }
-
-                    getUserName(auth, homeViewModel, errorMessage, isLoading)
-                    navigateToHome()
                 }
                 .addOnFailureListener { e ->
                     errorMessage.value = e.message
@@ -129,8 +139,8 @@ class FirebaseRepository() {
             .collection("contacts")
             .whereEqualTo("uidUsuario", uid)
             .get()
-            .addOnSuccessListener { reuslt ->
-                val contactos = reuslt.map { doc ->
+            .addOnSuccessListener { result ->
+                val contactos = result.map { doc ->
                     Contact(
                         name = doc.getString("nombre") ?: "",
                         phone = doc.getString("telefono") ?: "",
@@ -150,6 +160,67 @@ class FirebaseRepository() {
                 errorMessage.value = e.message
                 isLoading.value = false
             }
+    }
+
+    // Obtener Contraseña del usuario
+    fun getPassword(
+        password: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            onError("Usuario no autenticado.")
+            return
+        }
+
+        val email = user.email
+        if (email.isNullOrBlank()) {
+            onError("No se encontró el correo electrónico del usuario actual.")
+            return
+        }
+
+        Log.i("Reauth", "Email: $email") // Para depuración
+        Log.i("Reauth", "Password está vacío: ${password.isBlank()}") // Para depuración
+
+        try {
+            val credential = EmailAuthProvider.getCredential(email, password)
+            user.reauthenticate(credential).addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onSuccess()
+                } else {
+                    onError(task.exception?.localizedMessage ?: "Error de autenticación")
+                }
+            }
+        } catch (e: IllegalArgumentException) {
+            onError("Ingresa la contraseña")
+        }
+    }
+
+    fun updatePassword(
+        auth: FirebaseAuth,
+        context: Context,
+        newPassword: String,
+        confirmNewPassword: String,
+        errorMessage: MutableState<String?>,
+        isLoading: MutableState<Boolean>,
+        navigateToHome: () -> Unit
+    ) {
+        if (newPassword == confirmNewPassword && newPassword.length >= 6) {
+            isLoading.value = true
+            auth.currentUser?.updatePassword(newPassword)
+                ?.addOnSuccessListener {
+                    isLoading.value = false
+                    Toast.makeText(context, "Cambio de Contraseña Exitoso", Toast.LENGTH_LONG).show()
+                    navigateToHome()
+                }
+                ?.addOnFailureListener { e ->
+                    isLoading.value = false
+                    errorMessage.value = "Error al actualizar la contraseña: ${e.localizedMessage}"
+                }
+        } else {
+            errorMessage.value = "Las contraseñas no coinciden o son muy cortas"
+        }
     }
 
     fun getUserName(

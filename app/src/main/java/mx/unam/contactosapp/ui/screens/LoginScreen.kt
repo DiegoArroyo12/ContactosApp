@@ -143,8 +143,17 @@ fun LoginScreen(
                         }
                         FirebaseRepository().getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
                     } else {
-                        Log.i("diego", "Error: ${task.exception?.message}")
-                        errorMessage.value = "Correo o Contraseña Incorrectos"
+                        val exceptionMessage = task.exception?.message
+                        errorMessage.value = when {
+                            exceptionMessage?.contains("email address is badly formatted", ignoreCase = true) == true ->
+                                "El formato del correo es inválido"
+                            exceptionMessage?.contains("password is invalid", ignoreCase = true) == true ||
+                                    exceptionMessage?.contains("least 6 characters", ignoreCase = true) == true ->
+                                "La contraseña debe tener al menos 6 caracteres"
+                            exceptionMessage?.contains("network error", ignoreCase = true) == true ->
+                                "No hay conexión a internet"
+                            else -> "Correo o Contraseña Incorrectos"
+                        }
                         isLoading.value = false
                     }
                 }

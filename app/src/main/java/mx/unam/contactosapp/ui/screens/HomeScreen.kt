@@ -51,9 +51,10 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Contactos de ${nombre.ifBlank { "Usuario" }}",
+                        text = nombre.ifBlank { "Usuario" },
                         style = MaterialTheme.typography.headlineMedium,
-                        color = Color.White
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 0.dp)
                     )
                 },
                 actions = {

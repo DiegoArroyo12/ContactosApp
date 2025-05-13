@@ -33,9 +33,9 @@ fun ErrorDialog(message: String, onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(20.dp))
-                Button(
+                AppButton(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = Cancel)
+                    color = Cancel
                 ) {
                     Text("Cerrar")
                 }

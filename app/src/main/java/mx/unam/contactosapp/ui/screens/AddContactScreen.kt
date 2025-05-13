@@ -91,10 +91,10 @@ fun AddContactScreen(
         ActivityResultContracts.TakePicture()
     ) {
         if (it) {
-            Toast.makeText(context, "Foto tomada", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Foto Tomada", Toast.LENGTH_SHORT).show()
             capturedImageUri = uri
         } else {
-            Toast.makeText(context, "No se pudo tomar la foto $it", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Foto Cancelada", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -102,10 +102,10 @@ fun AddContactScreen(
         ActivityResultContracts.RequestPermission()
     ) {
         if (it) {
-            Toast.makeText(context, "Permiso autorizado", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Permiso Autorizado", Toast.LENGTH_SHORT).show()
             cameraLauncher.launch(uri)
         } else {
-            Toast.makeText(context, "Permiso denegado", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Permiso Denegado", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -308,10 +308,10 @@ fun AddContactScreen(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        Button(
+        AppButton(
             onClick = navigateToHome,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Cancel)
+            color = Cancel
         ) {
             Text("Cancelar")
         }

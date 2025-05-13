@@ -29,14 +29,14 @@ fun LoadingDialog(message: String = "Cargando...") {
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator(color = Success)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = MaterialTheme.typography.titleMedium.fontSize
                     ),
-                    color = Success
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }

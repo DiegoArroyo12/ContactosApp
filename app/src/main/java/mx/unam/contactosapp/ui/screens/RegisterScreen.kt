@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -45,6 +46,9 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHo
     var showNewPasswordDialog by remember { mutableStateOf(false) }
     val isLoading = remember { mutableStateOf(false) }
     val errorMessage = remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(isEditMode) {
         if (isEditMode) {
@@ -135,12 +139,12 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHo
 
             // Confirmar contraseña
             if (showPasswordDialog) {
+                var currentPassword by remember { mutableStateOf("") }
+
                 AlertDialog(
                     onDismissRequest = { showPasswordDialog = false },
                     title = { Text("Confirmar contraseña actual") },
                     text = {
-                        var currentPassword by remember { mutableStateOf("") }
-                        var passwordVisible by remember { mutableStateOf(false) }
                         AppTextField(
                             value = currentPassword,
                             onValueChange = { currentPassword = it },
@@ -152,18 +156,26 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHo
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                    tint = Color.Black,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.clickable { passwordVisible = !passwordVisible }
                                 )
                             },
-                            colorText = Color.Black
+                            colorText = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     confirmButton = {
                         AppButton(
                             onClick = {
-                                showPasswordDialog = false
-                                showNewPasswordDialog = true
+                                FirebaseRepository().getPassword(
+                                    password = currentPassword,
+                                    onSuccess = {
+                                        showPasswordDialog = false
+                                        showNewPasswordDialog = true
+                                    },
+                                    onError = {
+                                        errorMessage.value = it
+                                    }
+                                )
                             }
                         ) {
                             Text("Aceptar")
@@ -193,30 +205,52 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHo
                                 value = newPassword,
                                 onValueChange = { newPassword = it },
                                 label = "Nueva contraseña",
-                                isPassword = true,
+                                isPassword = !passwordVisible,
                                 modifier = Modifier.fillMaxWidth(),
-                                colorText = Color.Black
+                                trailingIcon = {
+                                    val icon = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.clickable { passwordVisible = !passwordVisible }
+                                    )
+                                },
+                                colorText = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             AppTextField(
                                 value = confirmNewPassword,
                                 onValueChange = { confirmNewPassword = it },
                                 label = "Confirmar contraseña",
-                                isPassword = true,
+                                isPassword = !passwordVisible,
                                 modifier = Modifier.fillMaxWidth(),
-                                colorText = Color.Black
+                                trailingIcon = {
+                                    val icon = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.clickable { passwordVisible = !passwordVisible }
+                                    )
+                                },
+                                colorText = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     },
                     confirmButton = {
+                        val context = LocalContext.current
                         AppButton(
                             onClick = {
-                                if (newPassword == confirmNewPassword && newPassword.length >= 6) {
-                                    auth.currentUser?.updatePassword(newPassword)
-                                    showNewPasswordDialog = false
-                                } else {
-                                    errorMessage.value = "Las contraseñas no coinciden o son muy cortas"
-                                }
+                                FirebaseRepository().updatePassword(
+                                    auth = auth,
+                                    context = context,
+                                    newPassword = newPassword,
+                                    confirmNewPassword = confirmNewPassword,
+                                    errorMessage = errorMessage,
+                                    isLoading = isLoading,
+                                    navigateToHome = navigateToHome
+                                )
                             }
                         ) {
                             Text("Actualizar")
@@ -279,7 +313,7 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHo
                 errorMessage.value = null
                 if (isEditMode) {
                     // Actualizar Usuario
-                    FirebaseRepository().editUser(auth, name, email, phone, password, homeViewModel, navigateToHome, errorMessage, isLoading)
+                    FirebaseRepository().editUser(auth, context, name, email, phone, password, homeViewModel, navigateToHome, errorMessage, isLoading)
                 } else {
                     // Crear Usuario
                     FirebaseRepository().createUser(auth, name, email, phone, password, navigateToLogin, errorMessage, isLoading)
