@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import mx.unam.contactosapp.data.model.Contact
 import mx.unam.contactosapp.viewmodel.HomeViewModel
@@ -93,6 +94,13 @@ class FirebaseRepository() {
                 .document(uid)
                 .update(updatedUserData)
                 .addOnSuccessListener {
+                    // Establecer displayName del usuario actual
+                    auth.currentUser?.updateProfile(
+                        UserProfileChangeRequest.Builder()
+                            .setDisplayName(name)
+                            .build()
+                    )
+
                     isLoading.value = false
                     navigateToHome()
 
