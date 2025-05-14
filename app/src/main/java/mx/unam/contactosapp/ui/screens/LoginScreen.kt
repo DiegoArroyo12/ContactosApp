@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +36,8 @@ import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.viewmodel.HomeViewModel
 import androidx.core.content.edit
 import mx.unam.contactosapp.ui.components.AppCheckBox
+import mx.unam.contactosapp.ui.components.ConfirmDialog
+import mx.unam.contactosapp.ui.theme.Cancel
 
 @Composable
 fun LoginScreen(
@@ -47,11 +50,15 @@ fun LoginScreen(
     val passwordState = remember { mutableStateOf("") }
     val isLoading = remember { mutableStateOf(false) }
     val errorMessage = remember { mutableStateOf<String?>(null) }
+    val confirmMessage = remember { mutableStateOf<String?>(null) }
     val email = emailState.value
     val password = passwordState.value
 
     val rememberMe = remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    val showResetDialog = remember { mutableStateOf(false) }
+    val resetEmailState = remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -68,6 +75,12 @@ fun LoginScreen(
 
         if (isLoading.value) {
             LoadingDialog("Iniciando Sesión")
+        }
+
+        confirmMessage.value?.let { message ->
+            ConfirmDialog(message = message) {
+                confirmMessage.value = null
+            }
         }
 
         errorMessage.value?.let { message ->
@@ -98,7 +111,7 @@ fun LoginScreen(
             isPassword = !passwordVisible,
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
-                val icon = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                val icon = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
                 Icon(
                     imageVector = icon,
                     contentDescription = if (passwordVisible) "Hide password" else "Show password",
@@ -107,6 +120,56 @@ fun LoginScreen(
                 )
             }
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Recuperar Contraseña
+        Text(
+            text = "¿Olvidaste tu contraseña?",
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.End)
+                .clickable {
+                    resetEmailState.value = emailState.value
+                    showResetDialog.value = true
+                }
+        )
+
+        if (showResetDialog.value) {
+            AlertDialog(
+                onDismissRequest = { showResetDialog.value = false },
+                title = { Text("Recuperar Contraseña") },
+                text = {
+                    AppTextField(
+                        value = resetEmailState.value,
+                        onValueChange = { resetEmailState.value = it },
+                        label = "Correo",
+                        isEmmail = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colorText = MaterialTheme.colorScheme.onSurface
+                    )
+                },
+                confirmButton = {
+                    AppButton(
+                        onClick = {
+                            val resetEmail = resetEmailState.value.trim()
+                            if (resetEmail.isNotBlank()) {
+                                FirebaseRepository().resetPassword(auth, resetEmail, errorMessage, confirmMessage, showResetDialog)
+                            } else {
+                                errorMessage.value = "Por favor ingresa un correo válido."
+                            }
+                        }
+                    ) {
+                        Text("Enviar")
+                    }
+                },
+                dismissButton = {
+                    AppButton(onClick = { showResetDialog.value = false }, color = Cancel) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 

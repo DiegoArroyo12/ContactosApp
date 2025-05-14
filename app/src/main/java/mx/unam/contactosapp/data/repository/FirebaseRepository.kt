@@ -11,6 +11,7 @@ import androidx.compose.runtime.MutableState
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import mx.unam.contactosapp.data.model.Contact
 import mx.unam.contactosapp.viewmodel.HomeViewModel
@@ -43,6 +44,10 @@ class FirebaseRepository() {
                         .document(uid ?: "")
                         .set(userData)
                         .addOnSuccessListener {
+                            // Establecer displayName del usuario actual
+                            val profileUpdates = userProfileChangeRequest { displayName = name }
+                            auth.currentUser!!.updateProfile(profileUpdates)
+
                             isLoading.value = false
                             navigateToLogin()
                         }
@@ -95,14 +100,8 @@ class FirebaseRepository() {
                 .update(updatedUserData)
                 .addOnSuccessListener {
                     // Establecer displayName del usuario actual
-                    auth.currentUser?.updateProfile(
-                        UserProfileChangeRequest.Builder()
-                            .setDisplayName(name)
-                            .build()
-                    )
-
-                    isLoading.value = false
-                    navigateToHome()
+                    val profileUpdates = userProfileChangeRequest { displayName = name }
+                    auth.currentUser!!.updateProfile(profileUpdates)
 
                     // Mostrar mensajes informativos después de la navegación
                     val currentEmail = auth.currentUser?.email
@@ -123,6 +122,9 @@ class FirebaseRepository() {
                                 ).show()
                             }
                     }
+
+                    isLoading.value = false
+                    navigateToHome()
                 }
                 .addOnFailureListener { e ->
                     errorMessage.value = e.message
@@ -203,6 +205,24 @@ class FirebaseRepository() {
         } catch (e: IllegalArgumentException) {
             onError("Ingresa la contraseña")
         }
+    }
+
+    // Recuperar Contraseña
+    fun resetPassword(
+        auth: FirebaseAuth,
+        resetEmail: String,
+        errorMessage: MutableState<String?>,
+        confirmMessage: MutableState<String?>,
+        showResetDialog: MutableState<Boolean>
+    ) {
+        auth.sendPasswordResetEmail(resetEmail)
+            .addOnSuccessListener {
+                showResetDialog.value = false
+                confirmMessage.value = "Te hemos enviado un correo para restablecer tu contraseña."
+            }
+            .addOnFailureListener {
+                errorMessage.value = "Error al enviar el correo: ${it.message}"
+            }
     }
 
     fun updatePassword(

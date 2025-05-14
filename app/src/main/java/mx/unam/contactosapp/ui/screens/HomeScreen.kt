@@ -1,11 +1,18 @@
 package mx.unam.contactosapp.ui.screens
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.ui.res.painterResource
 import mx.unam.contactosapp.R
 import androidx.compose.runtime.Composable
@@ -14,6 +21,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -21,7 +30,6 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.ContactCard
-import mx.unam.contactosapp.ui.theme.Cancel
 import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.viewmodel.HomeViewModel
 
@@ -42,6 +50,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val showSnackbar = remember { mutableStateOf(false) }
     val confirmDialogVisible = remember { mutableStateOf<String?>(null) }
+    var expandedMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost = {
@@ -58,15 +67,56 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = {
-                        navController.navigate("register?isEditMode=true")
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.settings_user),
-                            contentDescription = "Editar Usuario",
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
+                    Box {
+                        IconButton(onClick = { expandedMenu = true }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.settings_user),
+                                contentDescription = "Menú de usuario",
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = expandedMenu,
+                            onDismissRequest = { expandedMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Editar perfil",
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                        Text("Editar Perfil")
+                                    }
+                                },
+                                onClick = {
+                                    expandedMenu = false
+                                    navController.navigate("register?isEditMode=true")
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_logout),
+                                            contentDescription = "Cerrar sesión",
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                        Text("Cerrar Sesión")
+                                    }
+                                },
+                                onClick = {
+                                    expandedMenu = false
+                                    confirmLogout.value = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -79,21 +129,15 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.End
             ) {
-                // Logout
-                AppButton(
-                    onClick = { confirmLogout.value = true },
-                    color = Cancel
-                ) {
-                    Text(
-                        "Cerrar Sesión"
-                    )
-                }
-
                 // Nuevo Contacto
                 AppButton(onClick = { navigateToAddContact(null) }) {
-                    Text("Agregar Contacto")
+                    Icon(
+                        painter = painterResource(R.drawable.add_contact),
+                        contentDescription = "Nuevo Contacto",
+                        tint = Color.White
+                    )
                 }
             }
         }
@@ -198,9 +242,10 @@ fun HomeScreen(
                 placeholder = { Text("Buscar contacto") },
                 singleLine = true,
                 leadingIcon = {
-                    Image(
+                    Icon(
                         painter = painterResource(id = R.drawable.search_icon),
-                        contentDescription = "Buscar"
+                        contentDescription = "Buscar",
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             )
