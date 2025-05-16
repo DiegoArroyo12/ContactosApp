@@ -316,7 +316,7 @@ fun RegisterScreen(auth: FirebaseAuth, navigateToLogin: () -> Unit, navigateToHo
                     FirebaseRepository().editUser(auth, context, name, email, phone, password, homeViewModel, navigateToHome, errorMessage, isLoading)
                 } else {
                     // Crear Usuario
-                    FirebaseRepository().createUser(auth, name, email, phone, password, navigateToLogin, errorMessage, isLoading)
+                    FirebaseRepository().createUser(auth, context, homeViewModel, name, email, phone, password, navigateToHome, errorMessage, isLoading)
                 }
             },
             modifier = Modifier.fillMaxWidth()

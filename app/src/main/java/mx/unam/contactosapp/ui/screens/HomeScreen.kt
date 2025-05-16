@@ -32,6 +32,7 @@ import mx.unam.contactosapp.ui.components.AppButton
 import mx.unam.contactosapp.ui.components.ContactCard
 import mx.unam.contactosapp.data.repository.FirebaseRepository
 import mx.unam.contactosapp.viewmodel.HomeViewModel
+import androidx.core.content.edit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -209,7 +210,7 @@ fun HomeScreen(
                     TextButton(onClick = {
                         FirebaseAuth.getInstance().signOut()
                         val sharedPref = navController.context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
-                        sharedPref.edit().putBoolean("rememberUser", false).apply()
+                        sharedPref.edit() { putBoolean("rememberUser", false) }
                         navController.navigate("login") {
                             popUpTo("home") { inclusive = true }
                         }

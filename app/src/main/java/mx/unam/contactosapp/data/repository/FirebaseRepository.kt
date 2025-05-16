@@ -15,17 +15,20 @@ import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import mx.unam.contactosapp.data.model.Contact
 import mx.unam.contactosapp.viewmodel.HomeViewModel
+import androidx.core.content.edit
 
 class FirebaseRepository() {
 
     // Crear un nuevo usuario
     fun createUser(
         auth: FirebaseAuth,
+        context: Context,
+        homeViewModel: HomeViewModel,
         name: String,
         email: String,
         phone: String,
         password: String,
-        navigateToLogin: () -> Unit,
+        navigateToHome: () -> Unit,
         errorMessage: MutableState<String?>,
         isLoading: MutableState<Boolean>
     ) {
@@ -44,12 +47,19 @@ class FirebaseRepository() {
                         .document(uid ?: "")
                         .set(userData)
                         .addOnSuccessListener {
-                            // Establecer displayName del usuario actual
-                            val profileUpdates = userProfileChangeRequest { displayName = name }
-                            auth.currentUser!!.updateProfile(profileUpdates)
+                            val profileUpdates = userProfileChangeRequest {
+                                displayName = name
+                            }
 
-                            isLoading.value = false
-                            navigateToLogin()
+                            auth.currentUser!!.updateProfile(profileUpdates)
+                                .addOnCompleteListener {
+                                    // Mantener la sesión activa
+                                    val sharedPref = context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+                                    sharedPref.edit() { putBoolean("rememberUser", true) }
+
+                                    // Cargar sus datos
+                                    getContactsUser(auth, homeViewModel, navigateToHome, errorMessage, isLoading)
+                                }
                         }
                         .addOnFailureListener { e ->
                             errorMessage.value = e.message
@@ -57,7 +67,6 @@ class FirebaseRepository() {
                         }
                 } else {
                     val exceptionMessage = task.exception?.message
-
                     errorMessage.value = when {
                         exceptionMessage?.contains("email address is badly formatted", ignoreCase = true) == true ->
                             "El formato del correo es inválido."
