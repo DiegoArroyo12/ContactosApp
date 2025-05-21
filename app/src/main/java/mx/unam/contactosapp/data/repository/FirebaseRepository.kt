@@ -112,6 +112,8 @@ class FirebaseRepository() {
                     val profileUpdates = userProfileChangeRequest { displayName = name }
                     auth.currentUser!!.updateProfile(profileUpdates)
 
+                    homeViewModel.setNombreUsuario(name)
+
                     // Mostrar mensajes informativos después de la navegación
                     val currentEmail = auth.currentUser?.email
                     if (currentEmail != null && currentEmail != email) {
